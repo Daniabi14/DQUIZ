@@ -21,45 +21,66 @@ import {
 } from "lucide-react";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
+import { getQuizzes } from "@/lib/game/quizService";
+import { getGamesByHost } from "@/lib/game/gameService";
 
 export default function HostDashboardPage() {
   const { profile } = useAuth();
   const [stats, setStats] = useState({
-    totalQuizzes: 4,
-    totalQuestions: 48,
-    totalGames: 12,
-    totalParticipants: 384,
+    totalQuizzes: 0,
+    totalQuestions: 0,
+    totalGames: 0,
+    totalParticipants: 0,
   });
 
-  const [recentQuizzes, setRecentQuizzes] = useState([
-    {
-      id: "quiz_1",
-      name: "Computer Science Fundamentals",
-      category: "Technology",
-      difficulty: "medium",
-      questionCount: 15,
-      status: "published",
-      updatedAt: "2 hours ago",
-    },
-    {
-      id: "quiz_2",
-      name: "Modern Web Architecture & Cloud",
-      category: "Engineering",
-      difficulty: "hard",
-      questionCount: 20,
-      status: "published",
-      updatedAt: "Yesterday",
-    },
-    {
-      id: "quiz_3",
-      name: "General Science & Logic Trivia",
-      category: "General Knowledge",
-      difficulty: "easy",
-      questionCount: 10,
-      status: "draft",
-      updatedAt: "3 days ago",
-    },
-  ]);
+  const [recentQuizzes, setRecentQuizzes] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const quizzes = await getQuizzes(profile?.uid || "host");
+        const games = await getGamesByHost(profile?.uid || "host");
+        
+        let totalQ = 0;
+        quizzes.forEach((qz) => {
+          totalQ += qz.questionCount || 0;
+        });
+
+        let totalP = 0;
+        if (typeof window !== "undefined") {
+          games.forEach((g) => {
+            const raw = localStorage.getItem(`dquiz_game_players_${g.id}`);
+            if (raw) {
+              const list = JSON.parse(raw);
+              totalP += list.length;
+            }
+          });
+        }
+
+        setStats({
+          totalQuizzes: quizzes.length,
+          totalQuestions: totalQ,
+          totalGames: games.length,
+          totalParticipants: totalP,
+        });
+
+        setRecentQuizzes(
+          quizzes.slice(0, 5).map((q) => ({
+            id: q.id,
+            name: q.name,
+            category: q.category || "General",
+            difficulty: q.difficulty || "medium",
+            questionCount: q.questionCount || 0,
+            status: q.status || "published",
+            updatedAt: "Active",
+          }))
+        );
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+    loadData();
+  }, [profile?.uid]);
 
   return (
     <div className="space-y-8">

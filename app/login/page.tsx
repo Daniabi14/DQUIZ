@@ -95,28 +95,10 @@ export default function LoginPage() {
     } catch (err: any) {
       console.warn("Auth error:", err);
       setErrorMsg(
-        err.message || "Failed to sign in. Check credentials or use Quick Dev Login below."
+        err.message || "Failed to sign in. Please verify your email and password."
       );
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleQuickDevLogin = (devRole: "host" | "admin") => {
-    loginAsDevRole(
-      devRole,
-      devRole === "admin" ? "admin@dquiz.app" : "host@dquiz.app",
-      devRole === "admin" ? "System Admin" : "Prof. Alex Rivera"
-    );
-    showToast({
-      type: "success",
-      title: "Dev Session Active",
-      message: `Switched to ${devRole.toUpperCase()} Mode`,
-    });
-    if (devRole === "admin") {
-      router.push("/admin/dashboard");
-    } else {
-      router.push("/host/dashboard");
     }
   };
 
@@ -252,35 +234,6 @@ export default function LoginPage() {
               <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           </form>
-
-          {/* Quick Demo Test Logins */}
-          <div className="mt-8 pt-6 border-t border-slate-800/80 space-y-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-center">
-              Quick One-Click Test Logins
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickDevLogin("host")}
-                className="gap-2 border-brand-500/30 text-brand-300 hover:bg-brand-950/40"
-              >
-                <UserCheck className="w-4 h-4 text-brand-400" />
-                <span>Host Demo</span>
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickDevLogin("admin")}
-                className="gap-2 border-purple-500/30 text-purple-300 hover:bg-purple-950/40"
-              >
-                <Shield className="w-4 h-4 text-purple-400" />
-                <span>Admin Demo</span>
-              </Button>
-            </div>
-          </div>
         </Card>
       </motion.div>
     </div>

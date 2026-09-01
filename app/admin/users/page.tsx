@@ -20,10 +20,7 @@ interface UserItem {
 }
 
 const DEFAULT_USERS: UserItem[] = [
-  { id: "u1", name: "Daniel Abishek", email: "danielabishek60@gmail.com", role: "admin", status: "active", joined: "2026-08-01" },
-  { id: "u2", name: "Prof. Alex Rivera", email: "alex.r@univ.edu", role: "host", status: "active", joined: "2026-08-15" },
-  { id: "u3", name: "Dr. Sarah Chen", email: "schen@biotech.org", role: "host", status: "active", joined: "2026-08-20" },
-  { id: "u4", name: "Marcus Brody", email: "marcus@academy.io", role: "host", status: "active", joined: "2026-08-28" },
+  { id: "u_super", name: "Daniel Abishek", email: "danielabishek60@gmail.com", role: "admin", status: "active", joined: "Primary SuperAdmin" },
 ];
 
 export default function AdminUsersPage() {

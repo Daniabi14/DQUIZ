@@ -15,172 +15,21 @@ import {
 import { Quiz } from "@/types/quiz";
 import { Question } from "@/types/question";
 
-const DEFAULT_DEMO_QUIZZES: Quiz[] = [
-  {
-    id: "quiz_cs_101",
-    hostId: "dev_host_1",
-    hostName: "Prof. Alex Rivera",
-    name: "Computer Science & Web Fundamentals",
-    description: "Core algorithms, networking protocols, HTTP, and data structures.",
-    category: "Computer Science",
-    difficulty: "medium",
-    instructions: "Answer each question within the allotted time limit.",
-    status: "published",
-    questionCount: 4,
-    totalPoints: 4000,
-    estimatedTimeSeconds: 80,
-    createdAt: Date.now() - 86400000 * 2,
-  },
-  {
-    id: "quiz_react_202",
-    hostId: "dev_host_1",
-    hostName: "Prof. Alex Rivera",
-    name: "Modern React & Next.js Architecture",
-    description: "Server components, hooks, state management, and real-time synchronization.",
-    category: "Web Development",
-    difficulty: "hard",
-    instructions: "Pay close attention to concurrency and rendering models.",
-    status: "published",
-    questionCount: 3,
-    totalPoints: 3000,
-    estimatedTimeSeconds: 60,
-    createdAt: Date.now() - 86400000,
-  },
-];
+const DEFAULT_DEMO_QUIZZES: Quiz[] = [];
 
-const DEFAULT_DEMO_QUESTIONS: Record<string, Question[]> = {
-  quiz_cs_101: [
-    {
-      id: "q_1",
-      quizId: "quiz_cs_101",
-      orderNumber: 1,
-      questionText: "What does HTTP status code 418 represent?",
-      type: "single_choice",
-      options: [
-        { id: "opt_a", text: "I'm a teapot" },
-        { id: "opt_b", text: "Bad Gateway" },
-        { id: "opt_c", text: "Unauthorized" },
-        { id: "opt_d", text: "Payload Too Large" },
-      ],
-      correctOptionIds: ["opt_a"],
-      timeLimit: 20,
-      points: 1000,
-      explanation: "HTTP 418 is the Hyper Text Coffee Pot Control Protocol error defined in RFC 2324.",
-    },
-    {
-      id: "q_2",
-      quizId: "quiz_cs_101",
-      orderNumber: 2,
-      questionText: "JavaScript is a strictly compiled, strongly typed language by default.",
-      type: "true_false",
-      options: [
-        { id: "opt_true", text: "True" },
-        { id: "opt_false", text: "False" },
-      ],
-      correctOptionIds: ["opt_false"],
-      timeLimit: 15,
-      points: 1000,
-      explanation: "JavaScript is an interpreted/JIT-compiled, dynamically typed language.",
-    },
-    {
-      id: "q_3",
-      quizId: "quiz_cs_101",
-      orderNumber: 3,
-      questionText: "Which of the following are valid NoSQL database paradigms? (Select all that apply)",
-      type: "multiple_choice",
-      options: [
-        { id: "opt_1", text: "Document Store (e.g. Firestore / MongoDB)" },
-        { id: "opt_2", text: "Key-Value Store (e.g. Redis)" },
-        { id: "opt_3", text: "Graph Database (e.g. Neo4j)" },
-        { id: "opt_4", text: "Strict Relational Tables (e.g. Oracle SQL)" },
-      ],
-      correctOptionIds: ["opt_1", "opt_2", "opt_3"],
-      timeLimit: 30,
-      points: 1000,
-      explanation: "Document, Key-Value, Graph, and Wide-Column are NoSQL paradigms.",
-    },
-    {
-      id: "q_4",
-      quizId: "quiz_cs_101",
-      orderNumber: 4,
-      questionText: "What is the worst-case time complexity of standard QuickSort?",
-      type: "single_choice",
-      options: [
-        { id: "opt_a", text: "O(n log n)" },
-        { id: "opt_b", text: "O(n²)" },
-        { id: "opt_c", text: "O(n)" },
-        { id: "opt_d", text: "O(log n)" },
-      ],
-      correctOptionIds: ["opt_b"],
-      timeLimit: 20,
-      points: 1000,
-      explanation: "When poorly partitioned (e.g. already sorted array without random pivot), QuickSort degrades to O(n²).",
-    },
-  ],
-  quiz_react_202: [
-    {
-      id: "q_201",
-      quizId: "quiz_react_202",
-      orderNumber: 1,
-      questionText: "In Next.js App Router, all components inside the app directory are React Server Components by default.",
-      type: "true_false",
-      options: [
-        { id: "opt_true", text: "True" },
-        { id: "opt_false", text: "False" },
-      ],
-      correctOptionIds: ["opt_true"],
-      timeLimit: 15,
-      points: 1000,
-      explanation: "App Router components default to Server Components unless marked with 'use client'.",
-    },
-    {
-      id: "q_202",
-      quizId: "quiz_react_202",
-      orderNumber: 2,
-      questionText: "Which React hook is designed specifically for synchronizing with external stores without tearing?",
-      type: "single_choice",
-      options: [
-        { id: "opt_a", text: "useSyncExternalStore" },
-        { id: "opt_b", text: "useTransition" },
-        { id: "opt_c", text: "useDeferredValue" },
-        { id: "opt_d", text: "useLayoutEffect" },
-      ],
-      correctOptionIds: ["opt_a"],
-      timeLimit: 20,
-      points: 1000,
-      explanation: "useSyncExternalStore is recommended for reading and subscribing from external data sources.",
-    },
-    {
-      id: "q_203",
-      quizId: "quiz_react_202",
-      orderNumber: 3,
-      questionText: "Which HTTP header is utilized for Server-Sent Events (SSE) streaming?",
-      type: "single_choice",
-      options: [
-        { id: "opt_a", text: "text/event-stream" },
-        { id: "opt_b", text: "application/json" },
-        { id: "opt_c", text: "multipart/form-data" },
-        { id: "opt_d", text: "application/octet-stream" },
-      ],
-      correctOptionIds: ["opt_a"],
-      timeLimit: 20,
-      points: 1000,
-      explanation: "Content-Type: text/event-stream indicates standard SSE streaming.",
-    },
-  ],
-};
+const DEFAULT_DEMO_QUESTIONS: Record<string, Question[]> = {};
 
 function getLocalQuizzes(): Quiz[] {
-  if (typeof window === "undefined") return DEFAULT_DEMO_QUIZZES;
+  if (typeof window === "undefined") return [];
   const stored = localStorage.getItem("dquiz_local_quizzes");
   if (!stored) {
-    localStorage.setItem("dquiz_local_quizzes", JSON.stringify(DEFAULT_DEMO_QUIZZES));
-    return DEFAULT_DEMO_QUIZZES;
+    localStorage.setItem("dquiz_local_quizzes", JSON.stringify([]));
+    return [];
   }
   try {
     return JSON.parse(stored);
   } catch {
-    return DEFAULT_DEMO_QUIZZES;
+    return [];
   }
 }
 

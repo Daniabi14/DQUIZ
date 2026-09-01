@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -17,25 +17,58 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
 
 export default function AdminDashboardPage() {
   const { profile } = useAuth();
 
-  const [systemStats] = useState({
-    totalUsers: 142,
-    totalHosts: 38,
-    totalQuizzes: 124,
-    totalLiveGames: 89,
-    totalResponsesRecorded: 14820,
-    systemUptime: "99.98%",
+  const [systemStats, setSystemStats] = useState({
+    totalUsers: 1,
+    totalHosts: 0,
+    totalQuizzes: 0,
+    totalLiveGames: 0,
+    totalResponsesRecorded: 0,
+    systemUptime: "99.99%",
   });
 
-  const [recentHosts] = useState([
-    { id: "h1", name: "Prof. Alex Rivera", email: "alex.r@univ.edu", quizzes: 14, status: "active" },
-    { id: "h2", name: "Dr. Sarah Chen", email: "schen@biotech.org", quizzes: 9, status: "active" },
-    { id: "h3", name: "Marcus Brody", email: "marcus@academy.io", quizzes: 22, status: "active" },
-    { id: "h4", name: "Elena Rostova", email: "elena@techcorp.com", quizzes: 5, status: "active" },
-  ]);
+  const [recentHosts, setRecentHosts] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const usersSnap = await getDocs(collection(db, "users"));
+        const quizzesSnap = await getDocs(collection(db, "quizzes"));
+        const gamesSnap = await getDocs(collection(db, "games"));
+
+        const userCount = Math.max(1, usersSnap.size);
+        const hostCount = usersSnap.docs.filter((d) => d.data().role === "host").length;
+
+        setSystemStats({
+          totalUsers: userCount,
+          totalHosts: hostCount,
+          totalQuizzes: quizzesSnap.size,
+          totalLiveGames: gamesSnap.size,
+          totalResponsesRecorded: 0,
+          systemUptime: "99.99%",
+        });
+
+        const hostList = usersSnap.docs
+          .filter((d) => d.data().role === "host")
+          .map((d) => ({
+            id: d.id,
+            name: d.data().displayName || "Host",
+            email: d.data().email || "",
+            quizzes: 0,
+            status: d.data().disabled ? "suspended" : "active",
+          }));
+        setRecentHosts(hostList);
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    loadStats();
+  }, []);
 
   return (
     <div className="space-y-8">
