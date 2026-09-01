@@ -38,17 +38,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for local dev session fallback if using dev demo mode
   useEffect(() => {
-    const savedDevProfile = localStorage.getItem("dquiz_dev_profile");
-    if (savedDevProfile) {
-      try {
-        const parsed = JSON.parse(savedDevProfile);
-        setProfile(parsed);
-        setLoading(false);
-        return;
-      } catch (e) {
+    // Clear legacy mock profiles from storage
+    if (typeof window !== "undefined") {
+      const storedDev = localStorage.getItem("dquiz_dev_profile");
+      if (storedDev && storedDev.includes("Prof. Alex Rivera")) {
         localStorage.removeItem("dquiz_dev_profile");
+        localStorage.removeItem("dquiz_admin_users");
       }
     }
 
@@ -77,7 +73,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setProfile(newProfile);
             }
           } catch (err) {
-            console.warn("Firestore profile fetch error, using basic profile:", err);
+            console.warn("Firestore profile fetch error:", err);
             const isSuper = isSuperAdminEmail(fbUser.email);
             setProfile({
               uid: fbUser.uid,
@@ -87,26 +83,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             });
           }
         } else {
-          setProfile(null);
+          // Check for valid active session
+          const savedDevProfile = localStorage.getItem("dquiz_dev_profile");
+          if (savedDevProfile) {
+            try {
+              const parsed = JSON.parse(savedDevProfile);
+              setProfile(parsed);
+            } catch {
+              localStorage.removeItem("dquiz_dev_profile");
+              setProfile(null);
+            }
+          } else {
+            setProfile(null);
+          }
         }
         setLoading(false);
       });
 
       return () => unsubscribe();
     } catch (err) {
-      console.warn("Firebase Auth listener initialization notice:", err);
+      console.warn("Firebase Auth listener error:", err);
       setLoading(false);
     }
   }, []);
 
-  const loginAsDevRole = (role: UserRole, email = "host@dquiz.app", name = "Prof. Alex Rivera") => {
+  const loginAsDevRole = (role: UserRole, email = "danielabishek60@gmail.com", name = "Daniel Abishek") => {
+    const isSuper = isSuperAdminEmail(email);
+    const assignedRole: UserRole = isSuper ? "admin" : "host";
+
     const devProfile: UserProfile = {
-      uid: `dev_${role}_${Date.now()}`,
-      email: role === "admin" ? "admin@dquiz.app" : email,
-      displayName: role === "admin" ? "System Admin" : name,
-      role: role,
-      institution: "Global Academy",
-      department: "Computer Science",
+      uid: `usr_${Date.now()}`,
+      email: email,
+      displayName: name || (isSuper ? "Daniel Abishek" : "Host User"),
+      role: assignedRole,
+      institution: "DQUIZ Platform",
+      department: "Administration",
     };
     setProfile(devProfile);
     localStorage.setItem("dquiz_dev_profile", JSON.stringify(devProfile));
@@ -115,6 +126,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     try {
       localStorage.removeItem("dquiz_dev_profile");
+      localStorage.removeItem("dquiz_admin_users");
       if (auth.currentUser) {
         await fbSignOut(auth);
       }
@@ -142,9 +154,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const role = profile?.role || null;
-  const isHost = role === "host" || role === "admin";
+  const isHost = role === "host";
   const isAdmin = role === "admin";
-  const isStudent = role === "student";
+  const isStudent = !user && !profile;
 
   return (
     <AuthContext.Provider
