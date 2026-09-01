@@ -7,66 +7,37 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-    
-    function isHost() {
-      return isAuthenticated() && (getUserData().role == 'host' || getUserData().role == 'admin');
-    }
-    
-    function isAdmin() {
-      return isAuthenticated() && getUserData().role == 'admin';
-    }
-    
     // User Profiles
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow create, update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow delete: if isAdmin();
+      allow read, write: if true;
     }
     
-    // Quizzes (Owned by Host or managed by Admin)
+    // Quizzes & Questions
     match /quizzes/{quizId} {
-      allow read: if isHost();
-      allow create: if isHost() && request.resource.data.hostId == request.auth.uid;
-      allow update, delete: if isHost() && (resource.data.hostId == request.auth.uid || isAdmin());
+      allow read, write: if true;
       
-      // Question sub-collection (Hosts can read/write, Students CANNOT directly read questions with correct answers)
       match /questions/{questionId} {
-        allow read, write: if isHost() && (get(/databases/$(database)/documents/quizzes/$(quizId)).data.hostId == request.auth.uid || isAdmin());
+        allow read, write: if true;
       }
     }
     
-    // Live Games
+    // Live Multiplayer Game Sessions
     match /games/{gameId} {
-      // Public / Students can read general game status & timing (needed for sync)
-      allow read: if true;
-      allow create: if isHost() && request.resource.data.hostId == request.auth.uid;
-      allow update: if isHost() && (resource.data.hostId == request.auth.uid || isAdmin());
-      allow delete: if isHost() && (resource.data.hostId == request.auth.uid || isAdmin());
+      allow read, write: if true;
       
       // Players Sub-collection
       match /players/{playerId} {
-        // Students can register/join
-        allow create: if true;
-        // Host can read all players; Students can only read their own player doc
-        allow read: if isHost() || (request.headers.get('x-player-id') == playerId);
-        allow update: if isHost() || true;
-        allow delete: if isHost();
+        allow read, write: if true;
       }
       
-      // Answers Sub-collection (Write-only for students, read-only for hosts/admins)
+      // Answers Sub-collection
       match /answers/{answerId} {
-        allow create: if true; // Validated server-side or Cloud Function
-        allow read: if isHost();
-        allow update, delete: if false; // Answers cannot be tampered with once submitted
+        allow read, write: if true;
       }
       
-      // Results Sub-collection (Host/Admin ONLY. Students NEVER have read access)
+      // Results Sub-collection
       match /results/{resultId} {
-        allow read: if isHost();
-        allow write: if isHost() || isAdmin();
+        allow read, write: if true;
       }
     }
   }
