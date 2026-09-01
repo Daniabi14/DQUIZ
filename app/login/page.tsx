@@ -17,18 +17,29 @@ import {
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/client";
 import { isSuperAdminEmail } from "@/lib/auth/adminGuards";
-import { Sparkles, Shield, UserCheck, ArrowRight, KeyRound, Mail, Lock, User } from "lucide-react";
+import {
+  Sparkles,
+  Shield,
+  UserCheck,
+  ArrowRight,
+  KeyRound,
+  Mail,
+  Lock,
+  User,
+  Gamepad2,
+  Crown,
+} from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const { loginAsDevRole } = useAuth();
   const { showToast } = useToast();
 
+  const [portalType, setPortalType] = useState<"host" | "admin">("host");
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [role, setRole] = useState<"host" | "admin">("host");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -37,10 +48,17 @@ export default function LoginPage() {
     setErrorMsg(null);
     setIsLoading(true);
 
-    try {
-      const isSuper = isSuperAdminEmail(email);
-      const assignedRole: "admin" | "host" = isSuper ? "admin" : "host";
+    const isSuper = isSuperAdminEmail(email);
 
+    if (portalType === "admin" && !isSuper) {
+      setIsLoading(false);
+      setErrorMsg("Access Denied: This email address does not have Super Admin privileges.");
+      return;
+    }
+
+    const assignedRole: "admin" | "host" = isSuper ? "admin" : "host";
+
+    try {
       if (mode === "register") {
         try {
           const userCred = await createUserWithEmailAndPassword(auth, email, password);
@@ -49,16 +67,16 @@ export default function LoginPage() {
           await setDoc(doc(db, "users", userCred.user.uid), {
             uid: userCred.user.uid,
             email,
-            displayName,
+            displayName: displayName || (isSuper ? "Daniel Abishek" : "Host User"),
             role: assignedRole,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
         } catch (authErr: any) {
-          console.warn("Live Firebase Auth error, using local profile session:", authErr);
+          console.warn("Live Firebase Auth notice, using session:", authErr);
         }
 
-        loginAsDevRole(assignedRole, email, displayName);
+        loginAsDevRole(assignedRole, email, displayName || (isSuper ? "Daniel Abishek" : "Host User"));
 
         showToast({
           type: "success",
@@ -66,7 +84,7 @@ export default function LoginPage() {
           message: isSuper ? `Welcome Super Admin, ${displayName}!` : `Welcome Host, ${displayName}!`,
         });
 
-        if (assignedRole === "admin") {
+        if (portalType === "admin" || assignedRole === "admin") {
           router.push("/admin/dashboard");
         } else {
           router.push("/host/dashboard");
@@ -75,7 +93,7 @@ export default function LoginPage() {
         try {
           await signInWithEmailAndPassword(auth, email, password);
         } catch (authErr: any) {
-          console.warn("Live Firebase Auth sign-in notice, using local session:", authErr);
+          console.warn("Live Firebase Auth notice, using session:", authErr);
         }
 
         loginAsDevRole(assignedRole, email, displayName || email.split("@")[0]);
@@ -86,7 +104,7 @@ export default function LoginPage() {
           message: "Signed in successfully.",
         });
 
-        if (assignedRole === "admin") {
+        if (portalType === "admin" || assignedRole === "admin") {
           router.push("/admin/dashboard");
         } else {
           router.push("/host/dashboard");
@@ -102,31 +120,96 @@ export default function LoginPage() {
     }
   };
 
+  const isAdmin = portalType === "admin";
+
   return (
-    <div className="w-full max-w-md mx-auto px-4 py-12">
+    <div className="w-full max-w-md mx-auto px-4 py-10">
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <Card variant="glass" className="p-6 sm:p-8 border-slate-800 shadow-2xl">
+        {/* Role Portal Switcher Tab */}
+        <div className="flex bg-slate-950/80 p-1 rounded-2xl border border-slate-800 mb-6 shadow-xl">
+          <button
+            type="button"
+            onClick={() => {
+              setPortalType("host");
+              setErrorMsg(null);
+            }}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+              !isAdmin
+                ? "bg-brand-600 text-white shadow-lg shadow-brand-600/30"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Gamepad2 className="w-4 h-4" />
+            <span>Quiz Host Portal</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPortalType("admin");
+              setErrorMsg(null);
+            }}
+            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+              isAdmin
+                ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Crown className="w-4 h-4 text-purple-300" />
+            <span>Super Admin Portal</span>
+          </button>
+        </div>
+
+        <Card
+          variant="glass"
+          className={`p-6 sm:p-8 border shadow-2xl transition-colors ${
+            isAdmin ? "border-purple-500/30 shadow-purple-950/20" : "border-slate-800"
+          }`}
+        >
           {/* Header */}
           <div className="text-center space-y-2 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-brand-600/20 border border-brand-500/30 flex items-center justify-center mx-auto text-brand-400">
-              <Sparkles className="w-6 h-6" />
+            <div
+              className={`w-12 h-12 rounded-2xl border flex items-center justify-center mx-auto transition-colors ${
+                isAdmin
+                  ? "bg-purple-600/20 border-purple-500/40 text-purple-300"
+                  : "bg-brand-600/20 border-brand-500/30 text-brand-400"
+              }`}
+            >
+              {isAdmin ? <Shield className="w-6 h-6 text-purple-400" /> : <Sparkles className="w-6 h-6" />}
             </div>
+
+            <div>
+              <Badge
+                variant="primary"
+                size="sm"
+                className={isAdmin ? "bg-purple-950/60 border-purple-800 text-purple-300" : ""}
+              >
+                {isAdmin ? "SUPER ADMIN ACCESS" : "HOST PORTAL"}
+              </Badge>
+            </div>
+
             <h1 className="text-2xl font-extrabold text-white tracking-tight font-display">
-              {mode === "login" ? "Host & Admin Portal" : "Create Host Account"}
+              {isAdmin
+                ? mode === "login"
+                  ? "Super Admin Login"
+                  : "Super Admin Setup"
+                : mode === "login"
+                ? "Quiz Host Sign In"
+                : "Create Host Account"}
             </h1>
             <p className="text-xs text-slate-400">
-              {mode === "login"
-                ? "Sign in to manage quizzes, launch live sessions, and view reports."
-                : "Register a new host account to start creating live competitions."}
+              {isAdmin
+                ? "Sign in with your master administrative credentials."
+                : "Manage quizzes, host live multiplayer sessions, and download reports."}
             </p>
           </div>
 
-          {/* Tab Switcher */}
-          <div className="flex p-1 bg-slate-950/80 rounded-xl border border-slate-800 mb-6">
+          {/* Mode Switcher */}
+          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 mb-6">
             <button
               type="button"
               onClick={() => {
@@ -135,7 +218,9 @@ export default function LoginPage() {
               }}
               className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${
                 mode === "login"
-                  ? "bg-brand-600 text-white shadow-sm"
+                  ? isAdmin
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "bg-brand-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
@@ -149,7 +234,9 @@ export default function LoginPage() {
               }}
               className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${
                 mode === "register"
-                  ? "bg-brand-600 text-white shadow-sm"
+                  ? isAdmin
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "bg-brand-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
@@ -160,50 +247,19 @@ export default function LoginPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === "register" && (
-              <>
-                <Input
-                  label="Full Name"
-                  placeholder="e.g. Prof. Alex Rivera"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  required
-                />
-                <div className="space-y-1.5 text-left">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Account Role
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRole("host")}
-                      className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${
-                        role === "host"
-                          ? "border-brand-500 bg-brand-600/20 text-brand-300"
-                          : "border-slate-800 bg-slate-900 text-slate-400"
-                      }`}
-                    >
-                      Quiz Host
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRole("admin")}
-                      className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-all ${
-                        role === "admin"
-                          ? "border-purple-500 bg-purple-600/20 text-purple-300"
-                          : "border-slate-800 bg-slate-900 text-slate-400"
-                      }`}
-                    >
-                      Super Admin
-                    </button>
-                  </div>
-                </div>
-              </>
+              <Input
+                label="Full Name"
+                placeholder={isAdmin ? "Daniel Abishek" : "Your Name"}
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                required
+              />
             )}
 
             <Input
-              label="Email Address"
+              label={isAdmin ? "Super Admin Email" : "Host Email Address"}
               type="email"
-              placeholder="name@organization.com"
+              placeholder={isAdmin ? "danielabishek60@gmail.com" : "host@example.com"}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -228,9 +284,19 @@ export default function LoginPage() {
               type="submit"
               size="lg"
               isLoading={isLoading}
-              className="w-full mt-2"
+              className={`w-full mt-2 font-bold ${
+                isAdmin
+                  ? "bg-purple-600 hover:bg-purple-500 shadow-purple-600/30 text-white"
+                  : "bg-brand-600 hover:bg-brand-500 shadow-brand-600/30 text-white"
+              }`}
             >
-              {mode === "login" ? "Sign In to Dashboard" : "Complete Registration"}
+              {mode === "login"
+                ? isAdmin
+                  ? "Enter Super Admin Dashboard"
+                  : "Sign In to Host Dashboard"
+                : isAdmin
+                ? "Register Super Admin Account"
+                : "Complete Host Registration"}
               <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           </form>
