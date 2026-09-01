@@ -5,6 +5,7 @@ import { User as FirebaseUser, onAuthStateChanged, signOut as fbSignOut } from "
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase/client";
 import { UserProfile, UserRole } from "@/types/user";
+import { isSuperAdminEmail } from "./adminGuards";
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -61,12 +62,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (userDoc.exists()) {
               setProfile(userDoc.data() as UserProfile);
             } else {
-              // Default fallback to host role on first login
+              const isSuper = isSuperAdminEmail(fbUser.email);
+              const defaultRole: UserRole = isSuper ? "admin" : "host";
+
               const newProfile: UserProfile = {
                 uid: fbUser.uid,
                 email: fbUser.email,
-                displayName: fbUser.displayName || fbUser.email?.split("@")[0] || "Host User",
-                role: "host",
+                displayName: fbUser.displayName || fbUser.email?.split("@")[0] || "User",
+                role: defaultRole,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
               };
@@ -75,11 +78,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
           } catch (err) {
             console.warn("Firestore profile fetch error, using basic profile:", err);
+            const isSuper = isSuperAdminEmail(fbUser.email);
             setProfile({
               uid: fbUser.uid,
               email: fbUser.email,
-              displayName: fbUser.displayName || "Host User",
-              role: "host",
+              displayName: fbUser.displayName || "User",
+              role: isSuper ? "admin" : "host",
             });
           }
         } else {

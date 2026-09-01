@@ -16,6 +16,7 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/client";
+import { isSuperAdminEmail } from "@/lib/auth/adminGuards";
 import { Sparkles, Shield, UserCheck, ArrowRight, KeyRound, Mail, Lock, User } from "lucide-react";
 
 export default function LoginPage() {
@@ -37,6 +38,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      const isSuper = isSuperAdminEmail(email);
+      const assignedRole: "admin" | "host" = isSuper ? "admin" : "host";
+
       if (mode === "register") {
         try {
           const userCred = await createUserWithEmailAndPassword(auth, email, password);
@@ -46,24 +50,23 @@ export default function LoginPage() {
             uid: userCred.user.uid,
             email,
             displayName,
-            role: role,
+            role: assignedRole,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
         } catch (authErr: any) {
-          // If Firebase Web App is unconfigured / mock API key, persist user session locally
-          console.warn("Live Firebase Auth error, using secure local profile session:", authErr);
+          console.warn("Live Firebase Auth error, using local profile session:", authErr);
         }
 
-        loginAsDevRole(role, email, displayName);
+        loginAsDevRole(assignedRole, email, displayName);
 
         showToast({
           type: "success",
           title: "Account Created",
-          message: `Welcome, ${displayName}!`,
+          message: isSuper ? `Welcome Super Admin, ${displayName}!` : `Welcome Host, ${displayName}!`,
         });
 
-        if (role === "admin") {
+        if (assignedRole === "admin") {
           router.push("/admin/dashboard");
         } else {
           router.push("/host/dashboard");
@@ -75,14 +78,19 @@ export default function LoginPage() {
           console.warn("Live Firebase Auth sign-in notice, using local session:", authErr);
         }
 
-        loginAsDevRole("host", email, displayName || email.split("@")[0]);
+        loginAsDevRole(assignedRole, email, displayName || email.split("@")[0]);
 
         showToast({
           type: "success",
           title: "Welcome Back",
           message: "Signed in successfully.",
         });
-        router.push("/host/dashboard");
+
+        if (assignedRole === "admin") {
+          router.push("/admin/dashboard");
+        } else {
+          router.push("/host/dashboard");
+        }
       }
     } catch (err: any) {
       console.warn("Auth error:", err);
