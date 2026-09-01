@@ -15,53 +15,6 @@ import {
 import { Quiz } from "@/types/quiz";
 import { Question } from "@/types/question";
 
-const DEFAULT_DEMO_QUIZZES: Quiz[] = [];
-
-const DEFAULT_DEMO_QUESTIONS: Record<string, Question[]> = {};
-
-function getLocalQuizzes(): Quiz[] {
-  if (typeof window === "undefined") return [];
-  const stored = localStorage.getItem("dquiz_local_quizzes");
-  if (!stored) {
-    localStorage.setItem("dquiz_local_quizzes", JSON.stringify([]));
-    return [];
-  }
-  try {
-    return JSON.parse(stored);
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalQuizzes(quizzes: Quiz[]) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem("dquiz_local_quizzes", JSON.stringify(quizzes));
-  }
-}
-
-function getLocalQuestions(quizId: string): Question[] {
-  if (typeof window === "undefined") return DEFAULT_DEMO_QUESTIONS[quizId] || [];
-  const stored = localStorage.getItem(`dquiz_local_questions_${quizId}`);
-  if (!stored) {
-    const defaults = DEFAULT_DEMO_QUESTIONS[quizId] || [];
-    if (defaults.length > 0) {
-      localStorage.setItem(`dquiz_local_questions_${quizId}`, JSON.stringify(defaults));
-    }
-    return defaults;
-  }
-  try {
-    return JSON.parse(stored);
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalQuestions(quizId: string, questions: Question[]) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(`dquiz_local_questions_${quizId}`, JSON.stringify(questions));
-  }
-}
-
 export async function getQuizzes(hostId?: string): Promise<Quiz[]> {
   try {
     const quizzesRef = collection(db, "quizzes");
@@ -73,10 +26,9 @@ export async function getQuizzes(hostId?: string): Promise<Quiz[]> {
       return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Quiz));
     }
   } catch (err) {
-    console.warn("Firestore getQuizzes fallback to local cache:", err);
+    console.error("Firestore getQuizzes error:", err);
   }
-  const locals = getLocalQuizzes();
-  return hostId ? locals.filter((q) => !q.hostId || q.hostId === hostId || q.hostId.startsWith("dev_")) : locals;
+  return [];
 }
 
 export async function getQuizById(quizId: string): Promise<Quiz | null> {
@@ -87,10 +39,9 @@ export async function getQuizById(quizId: string): Promise<Quiz | null> {
       return { id: snap.id, ...snap.data() } as Quiz;
     }
   } catch (err) {
-    console.warn("Firestore getQuizById fallback to local cache:", err);
+    console.error("Firestore getQuizById error:", err);
   }
-  const locals = getLocalQuizzes();
-  return locals.find((q) => q.id === quizId) || null;
+  return null;
 }
 
 export async function createQuiz(quizData: Partial<Quiz>): Promise<string> {
@@ -119,11 +70,10 @@ export async function createQuiz(quizData: Partial<Quiz>): Promise<string> {
       updatedAt: serverTimestamp(),
     });
   } catch (err) {
-    console.warn("Firestore createQuiz fallback to local cache:", err);
+    console.error("Firestore createQuiz error:", err);
+    throw err;
   }
 
-  const locals = getLocalQuizzes();
-  saveLocalQuizzes([newQuiz, ...locals]);
   return quizId;
 }
 
@@ -134,25 +84,17 @@ export async function updateQuiz(quizId: string, data: Partial<Quiz>): Promise<v
       updatedAt: serverTimestamp(),
     });
   } catch (err) {
-    console.warn("Firestore updateQuiz fallback to local cache:", err);
+    console.error("Firestore updateQuiz error:", err);
+    throw err;
   }
-
-  const locals = getLocalQuizzes();
-  const updated = locals.map((q) => (q.id === quizId ? { ...q, ...data } : q));
-  saveLocalQuizzes(updated);
 }
 
 export async function deleteQuiz(quizId: string): Promise<void> {
   try {
     await deleteDoc(doc(db, "quizzes", quizId));
   } catch (err) {
-    console.warn("Firestore deleteQuiz fallback to local cache:", err);
-  }
-
-  const locals = getLocalQuizzes();
-  saveLocalQuizzes(locals.filter((q) => q.id !== quizId));
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(`dquiz_local_questions_${quizId}`);
+    console.error("Firestore deleteQuiz error:", err);
+    throw err;
   }
 }
 
@@ -176,17 +118,14 @@ export async function duplicateQuiz(quizId: string, hostId: string): Promise<str
     quizId: newQuizId,
   }));
 
-  const locals = getLocalQuizzes();
-  saveLocalQuizzes([duplicated, ...locals]);
-  saveLocalQuestions(newQuizId, newQuestions);
-
   try {
     await setDoc(doc(db, "quizzes", newQuizId), duplicated);
     for (const q of newQuestions) {
       await setDoc(doc(db, "quizzes", newQuizId, "questions", q.id), q);
     }
   } catch (err) {
-    console.warn("Firestore duplicateQuiz fallback to local cache:", err);
+    console.error("Firestore duplicateQuiz error:", err);
+    throw err;
   }
 
   return newQuizId;
@@ -200,9 +139,9 @@ export async function getQuestions(quizId: string): Promise<Question[]> {
       return qSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Question));
     }
   } catch (err) {
-    console.warn("Firestore getQuestions fallback to local cache:", err);
+    console.error("Firestore getQuestions error:", err);
   }
-  return getLocalQuestions(quizId);
+  return [];
 }
 
 export async function createQuestion(quizId: string, questionData: Partial<Question>): Promise<string> {
@@ -227,21 +166,19 @@ export async function createQuestion(quizId: string, questionData: Partial<Quest
   };
 
   const updatedQuestions = [...existing, newQuestion];
-  saveLocalQuestions(quizId, updatedQuestions);
-
-  // Update Quiz summary metadata
   const totalPoints = updatedQuestions.reduce((sum, q) => sum + (q.points || 0), 0);
   const totalTime = updatedQuestions.reduce((sum, q) => sum + (q.timeLimit || 20), 0);
-  await updateQuiz(quizId, {
-    questionCount: updatedQuestions.length,
-    totalPoints,
-    estimatedTimeSeconds: totalTime,
-  });
 
   try {
     await setDoc(doc(db, "quizzes", quizId, "questions", qId), newQuestion);
+    await updateQuiz(quizId, {
+      questionCount: updatedQuestions.length,
+      totalPoints,
+      estimatedTimeSeconds: totalTime,
+    });
   } catch (err) {
-    console.warn("Firestore createQuestion fallback to local cache:", err);
+    console.error("Firestore createQuestion error:", err);
+    throw err;
   }
 
   return qId;
@@ -252,52 +189,41 @@ export async function updateQuestion(
   questionId: string,
   data: Partial<Question>
 ): Promise<void> {
-  const questions = await getQuestions(quizId);
-  const updated = questions.map((q) => (q.id === questionId ? { ...q, ...data } : q));
-  saveLocalQuestions(quizId, updated);
-
-  const totalPoints = updated.reduce((sum, q) => sum + (q.points || 0), 0);
-  const totalTime = updated.reduce((sum, q) => sum + (q.timeLimit || 20), 0);
-  await updateQuiz(quizId, {
-    questionCount: updated.length,
-    totalPoints,
-    estimatedTimeSeconds: totalTime,
-  });
-
   try {
     await updateDoc(doc(db, "quizzes", quizId, "questions", questionId), data);
+    const questions = await getQuestions(quizId);
+    const totalPoints = questions.reduce((sum, q) => sum + (q.points || 0), 0);
+    const totalTime = questions.reduce((sum, q) => sum + (q.timeLimit || 20), 0);
+    await updateQuiz(quizId, {
+      questionCount: questions.length,
+      totalPoints,
+      estimatedTimeSeconds: totalTime,
+    });
   } catch (err) {
-    console.warn("Firestore updateQuestion fallback to local cache:", err);
+    console.error("Firestore updateQuestion error:", err);
+    throw err;
   }
 }
 
 export async function deleteQuestion(quizId: string, questionId: string): Promise<void> {
-  const questions = await getQuestions(quizId);
-  const filtered = questions
-    .filter((q) => q.id !== questionId)
-    .map((q, idx) => ({ ...q, orderNumber: idx + 1 }));
-
-  saveLocalQuestions(quizId, filtered);
-
-  const totalPoints = filtered.reduce((sum, q) => sum + (q.points || 0), 0);
-  const totalTime = filtered.reduce((sum, q) => sum + (q.timeLimit || 20), 0);
-  await updateQuiz(quizId, {
-    questionCount: filtered.length,
-    totalPoints,
-    estimatedTimeSeconds: totalTime,
-  });
-
   try {
     await deleteDoc(doc(db, "quizzes", quizId, "questions", questionId));
+    const questions = await getQuestions(quizId);
+    const totalPoints = questions.reduce((sum, q) => sum + (q.points || 0), 0);
+    const totalTime = questions.reduce((sum, q) => sum + (q.timeLimit || 20), 0);
+    await updateQuiz(quizId, {
+      questionCount: questions.length,
+      totalPoints,
+      estimatedTimeSeconds: totalTime,
+    });
   } catch (err) {
-    console.warn("Firestore deleteQuestion fallback to local cache:", err);
+    console.error("Firestore deleteQuestion error:", err);
+    throw err;
   }
 }
 
 export async function reorderQuestions(quizId: string, newQuestions: Question[]): Promise<void> {
   const indexed = newQuestions.map((q, idx) => ({ ...q, orderNumber: idx + 1 }));
-  saveLocalQuestions(quizId, indexed);
-
   try {
     for (const q of indexed) {
       await updateDoc(doc(db, "quizzes", quizId, "questions", q.id), {
@@ -305,7 +231,8 @@ export async function reorderQuestions(quizId: string, newQuestions: Question[])
       });
     }
   } catch (err) {
-    console.warn("Firestore reorderQuestions fallback:", err);
+    console.error("Firestore reorderQuestions error:", err);
+    throw err;
   }
 }
 
@@ -321,7 +248,7 @@ export async function getAllHostQuestions(
       results.push({
         question: q,
         quizName: quiz.name,
-        quizCategory: quiz.category,
+        quizCategory: quiz.category || "General",
       });
     }
   }
